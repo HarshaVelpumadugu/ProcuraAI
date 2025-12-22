@@ -5,6 +5,9 @@ const { analyzeProposal } = require("./proposal.ai");
 const { sendProposalReceivedEmail } = require("../email/email.service");
 const User = require("../users/user.model");
 const Vendor = require("../vendors/vendor.model");
+const {
+  markEvaluationOutdated,
+} = require("../evaluation/evaluation.controller");
 
 // Existing createProposal function (keep as is)
 const createProposal = async (req, res) => {
@@ -97,6 +100,16 @@ const createProposal = async (req, res) => {
     console.log("✅ Proposal created:", proposal._id);
 
     // Run AI analysis
+    try {
+      await markEvaluationOutdated(rfpId);
+      console.log("✅ Evaluation marked as outdated for RFP:", rfpId);
+    } catch (evalError) {
+      console.error(
+        "⚠️ Failed to mark evaluation outdated:",
+        evalError.message
+      );
+    }
+
     try {
       if (!proposal.aiAnalysis?.complianceScore) {
         const analysis = await analyzeProposal(proposal, rfp);

@@ -250,7 +250,7 @@ const Recommendation = () => {
               <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3">
                 <Button
                   variant="outline"
-                  onClick={() => navigate(`/buyer/evaluation/${id}/compare`)}
+                  onClick={() => navigate(`/buyer/rfps/${id}/compare`)}
                   className="w-full sm:w-auto text-xs sm:text-sm"
                 >
                   View Comparison
@@ -271,7 +271,7 @@ const Recommendation = () => {
                 No recommendation available yet
               </p>
               <Button
-                onClick={() => navigate(`/buyer/evaluation/${id}/compare`)}
+                onClick={() => navigate(`/buyer/rfps/${id}/compare`)}
                 className="w-full sm:w-auto text-xs sm:text-sm"
               >
                 Run Analysis First
