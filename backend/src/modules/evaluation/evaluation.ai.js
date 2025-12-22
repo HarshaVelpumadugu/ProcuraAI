@@ -22,7 +22,9 @@ const compareProposals = async (proposals, rfp) => {
     }));
 
     // Concise prompt
-    const prompt = `Compare proposals for: ${rfp.title}
+    const prompt = `Act as a Procurement Officer Compare proposals for: ${
+      rfp.title
+    }
 
 Budget: ${rfp.budget || "N/A"} ${rfp.currency || "USD"}
 Requirements: ${truncateText(rfp.requirements, 500)}
@@ -63,7 +65,9 @@ const generateRecommendation = async (proposals, rfp) => {
       evaluationScore: p.evaluationScore || 0,
     }));
 
-    const prompt = `Analyze proposals for: ${rfp.title}
+    const prompt = `Act as a Procurement Officer Analyze proposals for: ${
+      rfp.title
+    }
 
 Budget: ${rfp.budget || "N/A"} ${rfp.currency || "USD"}
 

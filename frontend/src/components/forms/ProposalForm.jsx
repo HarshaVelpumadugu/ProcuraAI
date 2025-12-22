@@ -95,14 +95,14 @@ const ProposalForm = ({ rfpId, onSubmit, onCancel, loading, error }) => {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Timeline <span className="text-red-500">*</span>
+            Timeline(in Weeks)<span className="text-red-500">*</span>
           </label>
           <input
             type="text"
             name="timeline"
             required
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-            placeholder="e.g., 6 weeks, 3 months"
+            placeholder="e.g., 6 "
             value={formData.timeline}
             onChange={handleChange}
           />

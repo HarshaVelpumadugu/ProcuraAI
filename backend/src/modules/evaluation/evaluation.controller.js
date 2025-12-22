@@ -30,7 +30,6 @@ const getAllEvaluations = async (req, res) => {
         })
         .sort({ lastEvaluatedAt: -1 });
     } else {
-      // For buyers: Get evaluations they created
       evaluations = await Evaluation.find({
         evaluatedBy: req.user._id,
       })
@@ -52,13 +51,11 @@ const getAllEvaluations = async (req, res) => {
   }
 };
 
-// Compare proposals for an RFP
 const compareRFPProposals = async (req, res) => {
   try {
     const { rfpId } = req.params;
-    const { forceRefresh } = req.query; // Optional: ?forceRefresh=true to regenerate
+    const { forceRefresh } = req.query;
 
-    // Verify RFP exists and user owns it
     const rfp = await RFP.findOne({
       _id: rfpId,
       createdBy: req.user._id,
@@ -67,8 +64,6 @@ const compareRFPProposals = async (req, res) => {
     if (!rfp) {
       return errorResponse(res, "RFP not found", 404);
     }
-
-    // Get all submitted proposals for this RFP
     const proposals = await Proposal.find({
       rfp: rfpId,
       status: { $in: ["submitted", "under_review"] },
@@ -85,8 +80,6 @@ const compareRFPProposals = async (req, res) => {
         400
       );
     }
-
-    // Check if evaluation already exists and is up to date
     let evaluation = await Evaluation.findOne({ rfp: rfpId });
 
     const shouldRegenerate =
@@ -96,12 +89,8 @@ const compareRFPProposals = async (req, res) => {
       evaluation.status === "outdated";
 
     if (shouldRegenerate) {
-      console.log("🔄 Generating new comparison...");
-
-      // Generate AI comparison
+      console.log("Generating new comparison...");
       const comparison = await compareProposals(proposals, rfp);
-
-      // Create or update evaluation
       const evaluationData = {
         rfp: rfpId,
         proposals: proposals.map((p) => p._id),
@@ -122,9 +111,9 @@ const compareRFPProposals = async (req, res) => {
         evaluation = await Evaluation.create(evaluationData);
       }
 
-      console.log("✅ Comparison saved to database");
+      console.log("Comparison saved to database");
     } else {
-      console.log("✅ Using cached comparison from database");
+      console.log("Using cached comparison from database");
     }
 
     successResponse(res, "Proposals compared successfully", {
@@ -153,13 +142,10 @@ const compareRFPProposals = async (req, res) => {
   }
 };
 
-// Generate recommendation for best proposal
 const getRecommendation = async (req, res) => {
   try {
     const { rfpId } = req.params;
     const { forceRefresh } = req.query;
-
-    // Verify RFP exists and user owns it
     const rfp = await RFP.findOne({
       _id: rfpId,
       createdBy: req.user._id,
@@ -168,46 +154,71 @@ const getRecommendation = async (req, res) => {
     if (!rfp) {
       return errorResponse(res, "RFP not found", 404);
     }
-
-    // Get all submitted proposals
-    const proposals = await Proposal.find({
+    const allProposals = await Proposal.find({
       rfp: rfpId,
-      status: { $in: ["submitted", "under_review"] },
     }).populate("vendor", "name company email phone");
+    const evaluableProposals = allProposals.filter(
+      (p) => p.status !== "rejected"
+    );
 
-    if (proposals.length === 0) {
+    if (evaluableProposals.length === 0) {
       return errorResponse(res, "No proposals found for this RFP", 404);
     }
-
-    // Check if evaluation already exists
     let evaluation = await Evaluation.findOne({ rfp: rfpId });
 
     const shouldRegenerate =
       !evaluation ||
       !evaluation.recommendation ||
       forceRefresh === "true" ||
-      evaluation.proposalsCount !== proposals.length ||
+      evaluation.proposalsCount !== evaluableProposals.length ||
       evaluation.status === "outdated";
 
     if (shouldRegenerate) {
-      console.log("🔄 Generating new recommendation...");
+      console.log("Generating new recommendation...");
+      const recommendation = await generateRecommendation(
+        evaluableProposals,
+        rfp
+      );
+      try {
+        const parsedRecommendation = JSON.parse(recommendation);
+        const topPickId =
+          parsedRecommendation.recommendations?.top_pick?.proposal_id;
 
-      // Generate AI recommendation
-      const recommendation = await generateRecommendation(proposals, rfp);
+        if (
+          topPickId &&
+          topPickId > 0 &&
+          topPickId <= evaluableProposals.length
+        ) {
+          const topProposal = evaluableProposals[topPickId - 1];
 
-      // Create or update evaluation
+          if (topProposal) {
+            if (topProposal.status !== "accepted") {
+              await Proposal.findByIdAndUpdate(topProposal._id, {
+                status: "accepted",
+              });
+              console.log(`Proposal ${topProposal._id} marked as accepted`);
+            }
+          }
+        } else {
+          console.log("No valid top pick found in recommendation");
+        }
+      } catch (parseError) {
+        console.error(
+          "Error parsing recommendation for status update:",
+          parseError
+        );
+      }
       const evaluationData = {
         rfp: rfpId,
-        proposals: proposals.map((p) => p._id),
+        proposals: evaluableProposals.map((p) => p._id),
         recommendation: recommendation,
         evaluatedBy: req.user._id,
-        proposalsCount: proposals.length,
+        proposalsCount: evaluableProposals.length,
         lastEvaluatedAt: new Date(),
         status: "completed",
       };
 
       if (evaluation) {
-        // Update existing evaluation
         evaluation = await Evaluation.findByIdAndUpdate(
           evaluation._id,
           { ...evaluationData, comparison: evaluation.comparison },
@@ -217,9 +228,30 @@ const getRecommendation = async (req, res) => {
         evaluation = await Evaluation.create(evaluationData);
       }
 
-      console.log("✅ Recommendation saved to database");
+      console.log("Recommendation saved to database");
     } else {
-      console.log("✅ Using cached recommendation from database");
+      console.log(" Using cached recommendation from database");
+      try {
+        const parsedRecommendation = JSON.parse(evaluation.recommendation);
+        const topPickId =
+          parsedRecommendation.recommendations?.top_pick?.proposal_id;
+
+        if (
+          topPickId &&
+          topPickId > 0 &&
+          topPickId <= evaluableProposals.length
+        ) {
+          const topProposal = evaluableProposals[topPickId - 1];
+
+          if (topProposal && topProposal.status !== "accepted") {
+            await Proposal.findByIdAndUpdate(topProposal._id, {
+              status: "accepted",
+            });
+          }
+        }
+      } catch (parseError) {
+        console.error("Error parsing cached recommendation:", parseError);
+      }
     }
 
     successResponse(res, "Recommendation generated successfully", {
@@ -229,7 +261,7 @@ const getRecommendation = async (req, res) => {
         description: rfp.description,
         budget: rfp.budget,
       },
-      proposalsEvaluated: proposals.length,
+      proposalsEvaluated: evaluableProposals.length,
       recommendation: evaluation.recommendation,
       cached: !shouldRegenerate,
       lastEvaluated: evaluation.lastEvaluatedAt,
@@ -240,17 +272,14 @@ const getRecommendation = async (req, res) => {
   }
 };
 
-// Mark evaluation as outdated (call this when new proposal is submitted)
 const markEvaluationOutdated = async (rfpId) => {
   try {
     await Evaluation.findOneAndUpdate({ rfp: rfpId }, { status: "outdated" });
-    console.log("✅ Evaluation marked as outdated for RFP:", rfpId);
   } catch (error) {
     console.error("Error marking evaluation outdated:", error);
   }
 };
 
-// Delete evaluation (optional - for admin or reset)
 const deleteEvaluation = async (req, res) => {
   try {
     const { rfpId } = req.params;

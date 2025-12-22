@@ -15,12 +15,10 @@ const evaluationSchema = new mongoose.Schema(
         ref: "Proposal",
       },
     ],
-    // ✅ CHANGED: comparison is now a plain string (AI-generated text)
     comparison: {
       type: String,
       default: null,
     },
-    // ✅ CHANGED: recommendation is now a plain string (AI-generated JSON string)
     recommendation: {
       type: String,
       default: null,
@@ -49,7 +47,6 @@ const evaluationSchema = new mongoose.Schema(
   }
 );
 
-// Index for faster queries
 evaluationSchema.index({ rfp: 1 });
 evaluationSchema.index({ evaluatedBy: 1 });
 

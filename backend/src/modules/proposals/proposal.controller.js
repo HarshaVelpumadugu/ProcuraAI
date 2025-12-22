@@ -9,7 +9,6 @@ const {
   markEvaluationOutdated,
 } = require("../evaluation/evaluation.controller");
 
-// Existing createProposal function (keep as is)
 const createProposal = async (req, res) => {
   try {
     console.log("Received proposal data:", req.body);
