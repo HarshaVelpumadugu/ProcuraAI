@@ -17,8 +17,8 @@ const compareProposals = async (proposals, rfp) => {
         ? `${p.timeline.durationWeeks} weeks`
         : "N/A",
       complianceScore: p.aiAnalysis?.complianceScore || 0,
-      strengths: (p.aiAnalysis?.strengths || []).slice(0, 3), // Top 3
-      weaknesses: (p.aiAnalysis?.weaknesses || []).slice(0, 2), // Top 2
+      strengths: (p.aiAnalysis?.strengths || []).slice(0, 3), 
+      weaknesses: (p.aiAnalysis?.weaknesses || []).slice(0, 2), 
     }));
 
     // Concise prompt
