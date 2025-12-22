@@ -12,7 +12,7 @@ const Sidebar = ({ items, activeItem, onItemClick, isOpen, onClose }) => {
 
       <aside
         className={`
-        fixed lg:sticky top-[80px] sm:top-[85px] lg:top-0 left-0 z-40
+        fixed lg:sticky top-[64px] sm:top-[85px] lg:top-0 left-0 z-40
         w-72 lg:w-64 h-[calc(100vh-60px)] sm:h-[calc(100vh-64px)] lg:h-screen
         bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900
         border-r border-slate-700

@@ -23,7 +23,6 @@ const RFPDetails = () => {
         rfpAPI.getById(id),
         proposalAPI.getByRFP(id).catch(() => ({ data: [] })),
       ]);
-
       setRfp(rfpRes.data);
       setProposals(proposalsRes.data || []);
     } catch (err) {
@@ -180,7 +179,9 @@ const RFPDetails = () => {
                             ${proposal.pricing?.totalCost?.toLocaleString()}
                           </p>
                           <p className="text-sm text-gray-500">
-                            {proposal.timeline?.duration || "N/A"}
+                            {proposal.timeline.durationWeeks
+                              ? `${proposal.timeline.durationWeeks} Weeks`
+                              : "N/A"}
                           </p>
                           {proposal.aiAnalysis?.complianceScore && (
                             <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-semibold">
