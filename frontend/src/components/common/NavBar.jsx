@@ -39,10 +39,10 @@ const Navbar = ({ onLogout, onMenuToggle, isMobileMenuOpen }) => {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-4">
-            <button className="p-2 hover:bg-slate-700 rounded-lg transition-colors relative">
+            {/* <button className="p-2 hover:bg-slate-700 rounded-lg transition-colors relative">
               <Bell size={18} className="text-slate-300" />
               <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse shadow-lg shadow-red-500/50" />
-            </button>
+            </button> */}
 
             <div className="flex items-center gap-2 sm:gap-3 pl-2 sm:pl-4 border-l border-slate-700">
               <div className="hidden sm:block text-right">

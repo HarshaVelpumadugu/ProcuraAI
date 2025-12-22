@@ -1,6 +1,5 @@
 const { model } = require("../../config/ai");
 
-// Helper function to truncate long text (saves tokens)
 const truncateText = (text, maxLength = 1000) => {
   if (!text || text.length <= maxLength) return text;
   return text.substring(0, maxLength) + "...";
@@ -8,9 +7,8 @@ const truncateText = (text, maxLength = 1000) => {
 
 const analyzeProposal = async (proposal, rfp) => {
   try {
-    // Optimize: Truncate long content to save tokens
     const shortRequirements = truncateText(rfp.requirements, 800);
-    const shortProposal = truncateText(proposal.technicalProposal, 1200); // Concise prompt (saves ~40% tokens)
+    const shortProposal = truncateText(proposal.technicalProposal, 1200);
 
     const prompt = `Analyze proposal vs RFP requirements.
 
@@ -36,20 +34,19 @@ Return ONLY valid JSON:
   "weaknesses": ["gap 1", "gap 2"],
   "summary": "short summary"
 }`;
-    // Generate with Flash model (fast & cheap)
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
-    let text = response.text(); // Clean response
+    let text = response.text();
 
     text = text.trim();
     if (text.startsWith("```json")) {
       text = text.replace(/```json\n?/g, "").replace(/```\n?/g, "");
     } else if (text.startsWith("```")) {
       text = text.replace(/```\n?/g, "");
-    } // Parse JSON
+    }
 
-    const analysis = JSON.parse(text.trim()); // Validate fields
+    const analysis = JSON.parse(text.trim());
 
     return {
       complianceScore: Number(analysis.complianceScore) || 0,

@@ -1,9 +1,56 @@
-// controllers/evaluation.controller.js
 const Proposal = require("../proposals/proposal.model");
 const RFP = require("../rfps/rfp.model");
 const Evaluation = require("./evaluation.model");
 const { successResponse, errorResponse } = require("../../utils/response");
 const { compareProposals, generateRecommendation } = require("./evaluation.ai");
+
+const getAllEvaluations = async (req, res) => {
+  try {
+    const isVendor = req.user.role === "vendor";
+
+    let evaluations;
+
+    if (isVendor) {
+      const vendorId = req.user.vendorId || req.user._id;
+      const vendorProposals = await Proposal.find({
+        vendor: vendorId,
+      }).select("rfp");
+      const rfpIds = [...new Set(vendorProposals.map((p) => p.rfp.toString()))];
+      evaluations = await Evaluation.find({
+        rfp: { $in: rfpIds },
+        status: "completed",
+      })
+        .populate("rfp", "title description budget")
+        .populate({
+          path: "proposals",
+          populate: {
+            path: "vendor",
+            select: "name company email phone",
+          },
+        })
+        .sort({ lastEvaluatedAt: -1 });
+    } else {
+      // For buyers: Get evaluations they created
+      evaluations = await Evaluation.find({
+        evaluatedBy: req.user._id,
+      })
+        .populate("rfp", "title description budget")
+        .populate({
+          path: "proposals",
+          populate: {
+            path: "vendor",
+            select: "name company email phone",
+          },
+        })
+        .sort({ lastEvaluatedAt: -1 });
+    }
+
+    successResponse(res, "Evaluations retrieved successfully", evaluations);
+  } catch (error) {
+    console.error("Error fetching evaluations:", error);
+    errorResponse(res, error.message, 400);
+  }
+};
 
 // Compare proposals for an RFP
 const compareRFPProposals = async (req, res) => {
@@ -224,6 +271,7 @@ const deleteEvaluation = async (req, res) => {
 };
 
 module.exports = {
+  getAllEvaluations,
   compareRFPProposals,
   getRecommendation,
   markEvaluationOutdated,

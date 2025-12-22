@@ -19,22 +19,17 @@ const AssignedRFPs = () => {
 
   const fetchRFPs = async () => {
     try {
-      // Get current vendor info
       const userStr = localStorage.getItem("user");
       const user = userStr ? JSON.parse(userStr) : null;
       const vendorId = user?.vendorId || user?._id || user?.id;
 
-      // Fetch all RFPs
       const res = await rfpAPI.getAll();
       console.log("All RFPs:", res);
 
-      // Fetch vendor's submitted proposals
       let submittedRFPs = [];
       try {
         const proposalsRes = await proposalAPI.getAll();
         console.log("All proposals:", proposalsRes);
-
-        // Filter proposals by current vendor and get RFP IDs
         if (proposalsRes.data) {
           submittedRFPs = proposalsRes.data
             .filter(

@@ -1,7 +1,6 @@
 const Vendor = require("./vendor.model");
 const { successResponse, errorResponse } = require("../../utils/response");
 
-// Create vendor
 const createVendor = async (req, res) => {
   try {
     const vendorData = {
@@ -16,15 +15,10 @@ const createVendor = async (req, res) => {
   }
 };
 
-// Get all vendors
-// vendor.controller.js
 const getAllVendors = async (req, res) => {
   try {
     const { page = 1, limit = 10, search, category } = req.query;
-
-    // If user is a buyer/admin, show all vendors
-    // If user is a vendor, show only their own profile
-    const query = req.user.role === "vendor" ? { userId: req.user._id } : {}; // Buyers see all vendors
+    const query = req.user.role === "vendor" ? { userId: req.user._id } : {};
 
     if (search) {
       query.$or = [

@@ -1,8 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { FileText, Send, Clock, CheckCircle } from "lucide-react";
+import {
+  FileText,
+  Send,
+  Clock,
+  CheckCircle,
+  Award,
+  Trophy,
+} from "lucide-react";
 import { rfpAPI } from "../../../api/rfp.api";
 import { proposalAPI } from "../../../api/proposal.api";
+import { evaluationAPI } from "../../../api/evaluation.api";
 import Loader from "../../../components/common/Loader";
 import Button from "../../../components/common/Button";
 
@@ -13,6 +21,8 @@ const VendorDashboard = () => {
     submittedProposals: 0,
     pendingRFPs: 0,
     wonProposals: 0,
+    recommendedCount: 0,
+    recommendationSuccessRate: 0,
   });
   const [recentRFPs, setRecentRFPs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,18 +33,15 @@ const VendorDashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
-      // Get current vendor info
       const userStr = localStorage.getItem("user");
       const user = userStr ? JSON.parse(userStr) : null;
       const vendorId = user?.vendorId || user?._id || user?.id;
 
       console.log("Fetching dashboard data for vendor:", vendorId);
 
-      // Fetch all RFPs
       const rfpRes = await rfpAPI.getAll();
       const allRFPs = rfpRes.data?.rfps || [];
 
-      // Fetch all proposals by this vendor
       let vendorProposals = [];
       try {
         const proposalRes = await proposalAPI.getAll();
@@ -47,8 +54,93 @@ const VendorDashboard = () => {
         console.error("Error fetching proposals:", err);
       }
 
-      // Get submitted RFP IDs
+      let allEvaluations = [];
+      try {
+        const evaluationRes = await evaluationAPI.getAll();
+        allEvaluations = evaluationRes.data || [];
+      } catch (err) {
+        console.error("Error fetching evaluations:", err);
+      }
+
       const submittedRFPIds = vendorProposals.map((p) => p.rfp?._id || p.rfp);
+
+      const vendorProposalIds = vendorProposals.map((p) => p._id.toString());
+
+      let recommendedCount = 0;
+      let recommendedAndWonCount = 0;
+
+      const vendorCompanyName = user?.company || user?.name || "";
+
+      console.log("Vendor company name for matching:", vendorCompanyName);
+      console.log("Total evaluations fetched:", allEvaluations.length);
+
+      for (const evaluation of allEvaluations) {
+        const rfpId = (evaluation.rfp?._id || evaluation.rfp).toString();
+        const hasSubmittedToRFP = submittedRFPIds.includes(rfpId);
+
+        console.log(
+          `Checking evaluation for RFP: ${rfpId}, submitted: ${hasSubmittedToRFP}`
+        );
+
+        if (hasSubmittedToRFP && evaluation.recommendation) {
+          try {
+            const recommendation = JSON.parse(evaluation.recommendation);
+            const topPick = recommendation.recommendations?.top_pick;
+            if (!topPick) {
+              console.log("No top pick found in recommendation");
+              continue;
+            }
+
+            const recommendedVendorName = topPick.vendor;
+            const recommendedProposalIndex = topPick.proposal_id;
+
+            console.log(
+              `Recommended vendor: ${recommendedVendorName}, proposal index: ${recommendedProposalIndex}`
+            );
+
+            const rfpProposals = vendorProposals.filter((p) => {
+              const proposalRfpId = (p.rfp?._id || p.rfp).toString();
+              return proposalRfpId === rfpId;
+            });
+
+            console.log(`Found ${rfpProposals.length} proposals for this RFP`);
+
+            const isRecommended =
+              recommendedVendorName.toLowerCase() ===
+              vendorCompanyName.toLowerCase();
+
+            console.log(`Is vendor recommended? ${isRecommended}`);
+
+            if (isRecommended) {
+              recommendedCount++;
+
+              const vendorProposalForRFP = rfpProposals.find((p) => {
+                const proposalVendorId = (p.vendor?._id || p.vendor).toString();
+                return proposalVendorId === vendorId.toString();
+              });
+
+              console.log(
+                `Vendor proposal status: ${vendorProposalForRFP?.status}`
+              );
+
+              if (
+                vendorProposalForRFP &&
+                (vendorProposalForRFP.status === "accepted" ||
+                  vendorProposalForRFP.status === "awarded")
+              ) {
+                recommendedAndWonCount++;
+                console.log("Vendor won this recommendation!");
+              }
+            }
+          } catch (err) {
+            console.error("Error parsing recommendation:", err);
+          }
+        }
+      }
+
+      console.log(
+        `Final stats - Recommended: ${recommendedCount}, Won: ${recommendedAndWonCount}`
+      );
 
       // Calculate stats
       const openRFPs = allRFPs.filter((rfp) => rfp.status === "open");
@@ -62,11 +154,18 @@ const VendorDashboard = () => {
         (p) => p.status === "submitted" || p.status === "under_review"
       );
 
+      const recommendationSuccessRate =
+        recommendedCount > 0
+          ? Math.round((recommendedAndWonCount / recommendedCount) * 100)
+          : 0;
+
       setStats({
         assignedRFPs: allRFPs.length,
         submittedProposals: vendorProposals.length,
-        pendingRFPs: availableRFPs.length, // RFPs available to submit
+        pendingRFPs: availableRFPs.length,
         wonProposals: wonProposals.length,
+        recommendedCount: recommendedCount,
+        recommendationSuccessRate: recommendationSuccessRate,
       });
 
       console.log("Dashboard stats:", {
@@ -74,6 +173,8 @@ const VendorDashboard = () => {
         submitted: vendorProposals.length,
         available: availableRFPs.length,
         won: wonProposals.length,
+        recommended: recommendedCount,
+        successRate: recommendationSuccessRate,
       });
 
       // Set recent RFPs (only ones without proposals)
@@ -158,6 +259,76 @@ const VendorDashboard = () => {
           </div>
         ))}
       </div>
+
+      {/* Recommendation Stats - New Section */}
+      {stats.recommendedCount > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+          <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6 border border-gray-100">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
+                <Award className="text-amber-600" size={20} />
+              </div>
+              <div>
+                <h3 className="text-xl sm:text-2xl font-bold text-gray-900">
+                  {stats.recommendedCount}
+                </h3>
+                <p className="text-xs sm:text-sm text-gray-500">
+                  Times Recommended
+                </p>
+              </div>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div
+                className="bg-amber-500 h-2 rounded-full transition-all"
+                style={{
+                  width: `${
+                    stats.submittedProposals > 0
+                      ? (stats.recommendedCount / stats.submittedProposals) *
+                        100
+                      : 0
+                  }%`,
+                }}
+              />
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              {stats.submittedProposals > 0
+                ? Math.round(
+                    (stats.recommendedCount / stats.submittedProposals) * 100
+                  )
+                : 0}
+              % of your proposals
+            </p>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6 border border-gray-100">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
+                <Trophy className="text-emerald-600" size={20} />
+              </div>
+              <div>
+                <h3 className="text-xl sm:text-2xl font-bold text-gray-900">
+                  {stats.recommendationSuccessRate}%
+                </h3>
+                <p className="text-xs sm:text-sm text-gray-500">
+                  Recommendation Success
+                </p>
+              </div>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div
+                className="bg-emerald-500 h-2 rounded-full transition-all"
+                style={{
+                  width: `${stats.recommendationSuccessRate}%`,
+                }}
+              />
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              When recommended, you win {stats.recommendationSuccessRate}% of
+              the time
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Recent RFPs and Quick Actions - Responsive Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
@@ -276,7 +447,7 @@ const VendorDashboard = () => {
             </button>
           </div>
 
-          {/* Additional Stats Summary */}
+          {/* Performance Summary */}
           {stats.submittedProposals > 0 && (
             <div className="mt-4 p-3 bg-gray-50 rounded-lg">
               <h4 className="text-sm font-semibold text-gray-700 mb-2">
@@ -300,6 +471,22 @@ const VendorDashboard = () => {
                     {stats.submittedProposals - stats.wonProposals}
                   </span>
                 </div>
+                {stats.recommendedCount > 0 && (
+                  <>
+                    <div className="flex justify-between pt-1 border-t border-gray-200 mt-1">
+                      <span>Recommended:</span>
+                      <span className="font-semibold text-amber-600">
+                        {stats.recommendedCount}x
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Recommendation Success:</span>
+                      <span className="font-semibold text-emerald-600">
+                        {stats.recommendationSuccessRate}%
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           )}

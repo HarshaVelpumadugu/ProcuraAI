@@ -22,7 +22,7 @@ const Login = () => {
     try {
       const res = await authAPI.login(formData);
 
-      const { token, user } = res.data; // ✅ correct extraction
+      const { token, user } = res.data;
 
       dispatch(loginSuccess({ token, user }));
 
@@ -41,33 +41,37 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-3 sm:p-4 lg:p-6">
       <div className="w-full max-w-md">
-        <div className="bg-white rounded-2xl shadow-2xl p-8">
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl mb-4 shadow-lg">
-              <FileText className="text-white" size={32} />
+        <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl sm:rounded-2xl shadow-2xl p-6 sm:p-8">
+          <div className="text-center mb-6 sm:mb-8">
+            <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl sm:rounded-2xl mb-3 sm:mb-4 shadow-lg">
+              <FileText className="text-white" size={24} />
             </div>
-            <h2 className="text-3xl font-bold text-gray-900">Welcome Back</h2>
-            <p className="text-gray-500 mt-2">Sign in to your account</p>
+            <h2 className="text-2xl sm:text-3xl font-bold text-white">
+              Welcome Back
+            </h2>
+            <p className="text-slate-400 mt-2 text-sm sm:text-base">
+              Sign in to your account
+            </p>
           </div>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm flex items-center gap-2">
-              <AlertCircle size={16} />
-              {error}
+            <div className="mb-4 p-3 bg-red-900/30 border border-red-500/50 rounded-lg text-red-400 text-xs sm:text-sm flex items-start gap-2">
+              <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
+              <span className="break-words">{error}</span>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-slate-300 mb-2">
                 Email
               </label>
               <input
                 type="email"
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-slate-900/50 border border-slate-600 text-white placeholder-slate-400 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm sm:text-base"
                 placeholder="you@example.com"
                 value={formData.email}
                 onChange={(e) =>
@@ -76,13 +80,13 @@ const Login = () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-slate-300 mb-2">
                 Password
               </label>
               <input
                 type="password"
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-slate-900/50 border border-slate-600 text-white placeholder-slate-400 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm sm:text-base"
                 placeholder="••••••••"
                 value={formData.password}
                 onChange={(e) =>
@@ -97,11 +101,11 @@ const Login = () => {
           </form>
 
           <div className="mt-6 text-center">
-            <p className="text-gray-600">
+            <p className="text-slate-400 text-sm sm:text-base">
               Don't have an account?{" "}
               <button
                 onClick={() => navigate("/register")}
-                className="text-blue-600 font-semibold hover:underline"
+                className="text-blue-400 font-semibold hover:text-blue-300 transition-colors"
               >
                 Register
               </button>

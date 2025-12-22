@@ -17,8 +17,6 @@ import CreateRFP from "../features/buyer/rfps/CreateRFP";
 import RFPDetails from "../features/buyer/rfps/RFPDetails";
 import SendRFP from "../features/buyer/rfps/SendRFP";
 import VendorList from "../features/buyer/vendors/VendorList";
-// import AddVendor from "../features/buyer/vendors/AddVendor";
-// import EditVendor from "../features/buyer/vendors/EditVendor";
 import ProposalList from "../features/buyer/proposals/ProposalList";
 import ProposalDetails from "../features/buyer/proposals/ProposalDetails";
 import CompareProposals from "../features/buyer/evaluation/CompareProposals";

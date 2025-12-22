@@ -2,11 +2,9 @@ const User = require("../users/user.model");
 const { generateToken } = require("../../config/jwt");
 const Vendor = require("../vendors/vendor.model");
 
-// auth.service.js or wherever your register function is
 const register = async (userData) => {
   const { name, email, password, role, company, phone } = userData;
 
-  // Check if user exists
   const existingUser = await User.findOne({ email });
   if (existingUser) {
     throw new Error("User already exists with this email");
@@ -19,7 +17,6 @@ const register = async (userData) => {
     }
   }
 
-  // Create user
   const user = await User.create({
     name,
     email,
@@ -29,7 +26,6 @@ const register = async (userData) => {
     phone,
   });
 
-  // If user registered as vendor, create vendor entry
   let createdVendor = null;
   if (role === "vendor") {
     createdVendor = await Vendor.create({
@@ -37,12 +33,10 @@ const register = async (userData) => {
       email: user.email,
       phone: user.phone,
       company: user.company,
-      userId: user._id, // Link to user account
-      createdBy: user._id, // Self-created
+      userId: user._id,
+      createdBy: user._id,
     });
   }
-
-  // Generate token
   const token = generateToken(user._id);
 
   return {
@@ -59,14 +53,11 @@ const register = async (userData) => {
 };
 
 const login = async (email, password) => {
-  // Check for user
   const user = await User.findOne({ email }).select("+password");
 
   if (!user) {
     throw new Error("Invalid credentials");
   }
-
-  // Check if password matches
   const isMatch = await user.comparePassword(password);
 
   if (!isMatch) {
@@ -82,12 +73,11 @@ const login = async (email, password) => {
     const vendor = await Vendor.findOne({ userId: user._id });
     if (vendor) {
       vendorId = vendor._id;
-      console.log("✅ Vendor found:", vendorId);
+      console.log("Vendor found:", vendorId);
     } else {
-      console.warn("⚠️ User is vendor but no Vendor document found");
+      console.warn("User is vendor but no Vendor document found");
     }
   }
-  // Generate token
   const token = generateToken(user._id);
 
   return {

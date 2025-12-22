@@ -7,7 +7,7 @@ import { rfpAPI } from "../../../api/rfp.api";
 import Button from "../../../components/common/Button";
 import ProposalForm from "../../../components/forms/ProposalForm";
 import Loader from "../../../components/common/Loader";
-import { toast } from "react-hot-toast"; // or your toast library
+import { toast } from "react-hot-toast";
 
 const SubmitProposal = () => {
   const { id } = useParams();

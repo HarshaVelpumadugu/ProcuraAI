@@ -12,7 +12,7 @@ const {
 // Existing createProposal function (keep as is)
 const createProposal = async (req, res) => {
   try {
-    console.log("📥 Received proposal data:", req.body);
+    console.log("Received proposal data:", req.body);
 
     const proposalData = {
       ...req.body,
@@ -20,23 +20,19 @@ const createProposal = async (req, res) => {
       status: "submitted",
     };
 
-    // ✅ Find vendor by the ID provided (could be User ID or Vendor ID)
     let vendor = await Vendor.findById(proposalData.vendor);
-
-    // If not found by _id, try finding by userId
     if (!vendor) {
-      console.log("🔍 Vendor not found by _id, trying userId...");
+      console.log("Vendor not found by _id, trying userId...");
       vendor = await Vendor.findOne({ userId: proposalData.vendor });
 
       if (vendor) {
-        console.log("✅ Vendor found by userId:", vendor._id);
-        // Update the proposal data to use the correct vendor _id
+        console.log("Vendor found by userId:", vendor._id);
         proposalData.vendor = vendor._id;
       }
     }
 
     if (!vendor) {
-      console.error("❌ Vendor not found with ID:", proposalData.vendor);
+      console.error(" Vendor not found with ID:", proposalData.vendor);
       return errorResponse(
         res,
         "Vendor not found. Please ensure you're logged in as a vendor.",
@@ -44,26 +40,22 @@ const createProposal = async (req, res) => {
       );
     }
 
-    console.log("✅ Vendor found:", {
+    console.log("Vendor found:", {
       _id: vendor._id,
       name: vendor.name,
       company: vendor.company,
       email: vendor.email,
       userId: vendor.userId,
     });
-
-    // ✅ Check if RFP exists and is open
     const rfpId = proposalData.rfp || proposalData.rfpId;
-    console.log("🔍 Looking for RFP with ID:", rfpId);
+    console.log("Looking for RFP with ID:", rfpId);
 
     const rfp = await RFP.findById(rfpId).populate("createdBy", "email name");
 
     if (!rfp) {
-      console.error("❌ RFP not found with ID:", rfpId);
+      console.error("RFP not found with ID:", rfpId);
       return errorResponse(res, "RFP not found", 404);
     }
-
-    console.log("✅ RFP found:", rfp.title);
 
     if (rfp.status !== "open") {
       return errorResponse(res, "RFP is not accepting proposals", 400);
@@ -73,41 +65,32 @@ const createProposal = async (req, res) => {
       return errorResponse(res, "RFP deadline has passed", 400);
     }
 
-    // ===== TIMELINE CALCULATION =====
     const durationWeeks = Number(proposalData.timeline?.duration);
 
     if (!durationWeeks || durationWeeks <= 0) {
       return errorResponse(res, "Invalid timeline duration", 400);
     }
 
-    // Start date = now
     const startDate = new Date();
 
-    // End date = now + weeks
     const endDate = new Date();
     endDate.setDate(endDate.getDate() + durationWeeks * 7);
 
-    // Attach computed timeline (overwrite frontend value safely)
     proposalData.timeline = {
       durationWeeks,
       estimatedStartDate: startDate,
       estimatedEndDate: endDate,
     };
 
-    // ✅ Create proposal with the correct vendor ID
-    console.log("💾 Creating proposal with vendor ID:", proposalData.vendor);
+    console.log("Creating proposal with vendor ID:", proposalData.vendor);
     const proposal = await Proposal.create(proposalData);
-    console.log("✅ Proposal created:", proposal._id);
+    console.log("Proposal created:", proposal._id);
 
     // Run AI analysis
     try {
       await markEvaluationOutdated(rfpId);
-      console.log("✅ Evaluation marked as outdated for RFP:", rfpId);
     } catch (evalError) {
-      console.error(
-        "⚠️ Failed to mark evaluation outdated:",
-        evalError.message
-      );
+      console.error("Failed to mark evaluation outdated:", evalError.message);
     }
 
     try {
@@ -117,31 +100,20 @@ const createProposal = async (req, res) => {
         await proposal.save();
       }
     } catch (error) {
-      console.error("⚠️ AI Analysis failed:", error.message);
+      console.error(" AI Analysis failed:", error.message);
     }
 
-    // Populate proposal
     const populatedProposal = await Proposal.findById(proposal._id)
       .populate("rfp", "title description createdBy")
       .populate("vendor", "name company email phone");
 
-    console.log(
-      "✅ Populated proposal - Vendor:",
-      populatedProposal.vendor ? "Found" : "NOT FOUND"
-    );
-
-    // ✅ Send email notification
     try {
-      console.log("📧 Preparing to send email...");
-
-      // Use the vendor we already have (most reliable)
+      console.log("Preparing to send email...");
       const vendorForEmail = populatedProposal.vendor || vendor;
 
       if (!vendorForEmail) {
         throw new Error("Vendor information not available");
       }
-
-      // Get buyer email
       let buyerEmail;
 
       if (
@@ -156,18 +128,18 @@ const createProposal = async (req, res) => {
       }
 
       if (!buyerEmail) {
-        console.warn("⚠️ Buyer email not found");
+        console.warn(" Buyer email not found");
       } else {
-        console.log("📧 Sending email to:", buyerEmail);
+        console.log("Sending email to:", buyerEmail);
         await sendProposalReceivedEmail(
           buyerEmail,
           populatedProposal,
           vendorForEmail
         );
-        console.log("✅ Email sent successfully!");
+        console.log(" Email sent successfully!");
       }
     } catch (emailError) {
-      console.error("❌ Email error:", emailError.message);
+      console.error("Email error:", emailError.message);
     }
 
     successResponse(
@@ -177,12 +149,10 @@ const createProposal = async (req, res) => {
       201
     );
   } catch (error) {
-    console.error("❌ Error creating proposal:", error);
+    console.error("Error creating proposal:", error);
     errorResponse(res, error.message, 400);
   }
 };
-
-// Existing getProposalsByRFP function (keep as is)
 const getProposalsByRFP = async (req, res) => {
   try {
     const rfp = await RFP.findOne({
@@ -217,7 +187,6 @@ const getAllProposals = async (req, res) => {
   }
 };
 
-// Existing getProposalById function (keep as is)
 const getProposalById = async (req, res) => {
   try {
     const proposal = await Proposal.findById(req.params.proposalId)
@@ -227,8 +196,6 @@ const getProposalById = async (req, res) => {
     if (!proposal) {
       return errorResponse(res, "Proposal not found", 404);
     }
-
-    //Check if user is authorized to view this proposal
     const rfp = await RFP.findById(proposal.rfp._id);
     if (rfp.createdBy.toString() !== req.user._id.toString()) {
       return errorResponse(res, "Not authorized to view this proposal", 403);
@@ -240,16 +207,9 @@ const getProposalById = async (req, res) => {
   }
 };
 
-// ============================================
-// ✅ NEW: VENDOR-SPECIFIC ROUTES
-// ============================================
-
-// Get all proposals submitted by this vendor
 const getMyProposals = async (req, res) => {
   try {
     const { page = 1, limit = 10, status } = req.query;
-
-    // Find vendor profile for this user
     const vendor = await Vendor.findOne({ userId: req.user._id });
 
     if (!vendor) {
@@ -260,8 +220,6 @@ const getMyProposals = async (req, res) => {
         total: 0,
       });
     }
-
-    // Build query
     const query = { vendor: vendor._id };
 
     if (status) {
@@ -290,10 +248,8 @@ const getMyProposals = async (req, res) => {
   }
 };
 
-// Get a single proposal by ID (vendor's own)
 const getMyProposalById = async (req, res) => {
   try {
-    // Find vendor profile for this user
     const vendor = await Vendor.findOne({ userId: req.user._id });
 
     if (!vendor) {
@@ -302,7 +258,7 @@ const getMyProposalById = async (req, res) => {
 
     const proposal = await Proposal.findOne({
       _id: req.params.proposalId,
-      vendor: vendor._id, // Ensure vendor can only see their own proposals
+      vendor: vendor._id,
     })
       .populate("rfp", "title description requirements deadline budget status")
       .populate("vendor", "name email company phone");
@@ -318,17 +274,13 @@ const getMyProposalById = async (req, res) => {
   }
 };
 
-// Update a proposal (vendor can update before deadline)
 const updateMyProposal = async (req, res) => {
   try {
-    // Find vendor profile for this user
     const vendor = await Vendor.findOne({ userId: req.user._id });
 
     if (!vendor) {
       return errorResponse(res, "Vendor profile not found", 404);
     }
-
-    // Find proposal and check if it belongs to this vendor
     const proposal = await Proposal.findOne({
       _id: req.params.proposalId,
       vendor: vendor._id,
@@ -338,17 +290,13 @@ const updateMyProposal = async (req, res) => {
       return errorResponse(res, "Proposal not found", 404);
     }
 
-    // Check if RFP is still open
     if (proposal.rfp.status !== "open") {
       return errorResponse(res, "Cannot update proposal for a closed RFP", 400);
     }
 
-    // Check if deadline has passed
     if (new Date() > new Date(proposal.rfp.deadline)) {
       return errorResponse(res, "Cannot update proposal after deadline", 400);
     }
-
-    // Check if proposal is already accepted/rejected
     if (proposal.status === "accepted" || proposal.status === "rejected") {
       return errorResponse(
         res,
@@ -356,8 +304,6 @@ const updateMyProposal = async (req, res) => {
         400
       );
     }
-
-    // Update proposal
     const updatedProposal = await Proposal.findByIdAndUpdate(
       req.params.proposalId,
       {
@@ -376,17 +322,13 @@ const updateMyProposal = async (req, res) => {
   }
 };
 
-// Withdraw a proposal
 const withdrawProposal = async (req, res) => {
   try {
-    // Find vendor profile for this user
     const vendor = await Vendor.findOne({ userId: req.user._id });
 
     if (!vendor) {
       return errorResponse(res, "Vendor profile not found", 404);
     }
-
-    // Find proposal and check if it belongs to this vendor
     const proposal = await Proposal.findOne({
       _id: req.params.proposalId,
       vendor: vendor._id,
@@ -395,8 +337,6 @@ const withdrawProposal = async (req, res) => {
     if (!proposal) {
       return errorResponse(res, "Proposal not found", 404);
     }
-
-    // Check if RFP is still open
     if (proposal.rfp.status !== "open") {
       return errorResponse(
         res,
@@ -404,13 +344,9 @@ const withdrawProposal = async (req, res) => {
         400
       );
     }
-
-    // Check if proposal is already accepted
     if (proposal.status === "accepted") {
       return errorResponse(res, "Cannot withdraw an accepted proposal", 400);
     }
-
-    // Delete proposal
     await Proposal.findByIdAndDelete(req.params.proposalId);
 
     successResponse(res, "Proposal withdrawn successfully", null);

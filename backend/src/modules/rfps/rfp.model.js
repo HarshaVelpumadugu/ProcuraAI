@@ -46,7 +46,7 @@ const rfpSchema = new mongoose.Schema(
     status: {
       type: String,
       enum: ["draft", "open", "closed", "awarded"],
-      default: "draft",
+      default: "open",
     },
     sentTo: [
       {

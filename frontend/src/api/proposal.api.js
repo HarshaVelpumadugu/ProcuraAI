@@ -1,4 +1,3 @@
-// api/proposal.api.js
 import axios from "./axios";
 
 export const proposalAPI = {
@@ -6,15 +5,12 @@ export const proposalAPI = {
     try {
       const userStr = localStorage.getItem("user");
       const user = userStr ? JSON.parse(userStr) : null;
-
       if (!user) {
         throw new Error("User not authenticated");
       }
-
-      // ✅ Use vendorId for vendors, _id for backward compatibility
       const vendorId = user.vendorId;
 
-      console.log("📝 Submitting proposal:");
+      console.log("Submitting proposal:");
       console.log("User:", user);
       console.log("Vendor ID:", vendorId);
 
@@ -24,7 +20,7 @@ export const proposalAPI = {
 
       const payload = {
         rfp: proposalData.rfpId,
-        vendor: vendorId, // ✅ Use the correct vendor ID
+        vendor: vendorId,
         coverLetter: proposalData.description,
         technicalProposal: proposalData.technicalApproach,
         pricing: {
@@ -37,12 +33,12 @@ export const proposalAPI = {
         deliverables: proposalData.deliverables,
       };
 
-      console.log("📤 Proposal payload:", payload);
+      console.log("Proposal payload:", payload);
 
       const response = await axios.post("/proposals", payload);
       return response.data;
     } catch (error) {
-      console.error("❌ Error submitting proposal:", error);
+      console.error("Error submitting proposal:", error);
       throw error;
     }
   },
@@ -57,7 +53,6 @@ export const proposalAPI = {
     return response.data;
   },
 
-  // Update my proposal (vendor)
   updateMyProposal: async (proposalId, proposalData) => {
     const response = await axios.put(
       `/proposals/my-proposals/${proposalId}`,
@@ -66,7 +61,6 @@ export const proposalAPI = {
     return response.data;
   },
 
-  // Withdraw my proposal (vendor)
   withdrawProposal: async (proposalId) => {
     const response = await axios.delete(
       `/proposals/my-proposals/${proposalId}`

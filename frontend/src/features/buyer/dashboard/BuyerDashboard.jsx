@@ -7,10 +7,13 @@ import {
   TrendingUp,
   CheckCircle,
   AlertCircle,
+  Award,
+  BarChart3,
 } from "lucide-react";
 import { rfpAPI } from "../../../api/rfp.api";
 import { vendorAPI } from "../../../api/vendor.api";
 import { proposalAPI } from "../../../api/proposal.api";
+import { evaluationAPI } from "../../../api/evaluation.api";
 import Loader from "../../../components/common/Loader";
 import { Link } from "react-router-dom";
 
@@ -20,11 +23,13 @@ const BuyerDashboard = () => {
     activeRFPs: 0,
     totalVendors: 0,
     totalProposals: 0,
-    pendingProposals: 0,
     acceptedProposals: 0,
+    evaluatedRFPs: 0,
+    recommendedVendorsWon: 0,
   });
   const [recentRFPs, setRecentRFPs] = useState([]);
   const [recentProposals, setRecentProposals] = useState([]);
+  const [recentEvaluations, setRecentEvaluations] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -33,73 +38,131 @@ const BuyerDashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
-      // Fetch all data in parallel
-      const [rfpRes, vendorRes, proposalRes] = await Promise.all([
-        rfpAPI.getAll(),
-        vendorAPI.getAll(),
-        proposalAPI.getAll().catch((err) => {
-          console.error("Error fetching proposals:", err);
-          return { data: [] };
-        }),
-      ]);
-
-      const rfps = rfpRes.data.rfps || [];
-      const vendors = vendorRes.data?.vendors || vendorRes.data || [];
-      const proposals = proposalRes.data || [];
-      console.log("vendors:", vendors);
-
-      console.log("Dashboard Data:", {
-        rfps: rfps.length,
-        vendors: vendors.length,
-        proposals: proposals.length,
-      });
-
-      // Get current user (buyer) ID
       const userStr = localStorage.getItem("user");
       const user = userStr ? JSON.parse(userStr) : null;
       const buyerId = user?._id || user?.id;
 
-      // Filter RFPs created by this buyer
+      const [rfpRes, vendorRes, proposalRes, evaluationRes] = await Promise.all(
+        [
+          rfpAPI.getAll(),
+          vendorAPI.getAll(),
+          proposalAPI.getAll().catch((err) => {
+            console.error("Error fetching proposals:", err);
+            return { data: [] };
+          }),
+          evaluationAPI.getAll().catch((err) => {
+            console.error("Error fetching evaluations:", err);
+            return { data: [] };
+          }),
+        ]
+      );
+
+      const rfps = rfpRes.data.rfps || [];
+      const vendors = vendorRes.data?.vendors || vendorRes.data || [];
+      const proposals = proposalRes.data || [];
+      const evaluations = evaluationRes.data || [];
+
       const buyerRFPs = rfps.filter(
         (rfp) => rfp.createdBy?._id === buyerId || rfp.createdBy === buyerId
       );
 
-      // Get RFP IDs created by this buyer
       const buyerRFPIds = buyerRFPs.map((rfp) => rfp._id);
 
-      // Filter proposals for buyer's RFPs
       const buyerProposals = proposals.filter((proposal) =>
         buyerRFPIds.includes(proposal.rfp?._id || proposal.rfp)
       );
 
-      // Calculate proposal stats
+      const buyerEvaluations = evaluations.filter((evaluation) =>
+        buyerRFPIds.includes(evaluation.rfp?._id || evaluation.rfp)
+      );
+
       const pendingProposals = buyerProposals.filter(
         (p) => p.status === "submitted" || p.status === "under_review"
       );
       const acceptedProposals = buyerProposals.filter(
         (p) => p.status === "accepted" || p.status === "awarded"
       );
+      const evaluatedRFPs = buyerEvaluations.filter(
+        (e) => e.status === "completed" && e.recommendation
+      ).length;
+
+      let recommendedVendorsWon = 0;
+
+      console.log("Buyer evaluations:", buyerEvaluations.length);
+
+      for (const evaluation of buyerEvaluations) {
+        if (evaluation.recommendation && evaluation.status === "completed") {
+          try {
+            const recommendation = JSON.parse(evaluation.recommendation);
+            const topPick = recommendation.recommendations?.top_pick;
+            if (!topPick) {
+              continue;
+            }
+            const recommendedProposalIndex = topPick.proposal_id;
+            const recommendedVendorName = topPick.vendor;
+            const rfpId = (evaluation.rfp?._id || evaluation.rfp).toString();
+            const rfpProposals = buyerProposals.filter((p) => {
+              const proposalRfpId = (p.rfp?._id || p.rfp).toString();
+              return proposalRfpId === rfpId;
+            });
+
+            console.log(
+              `Found ${rfpProposals.length} proposals for RFP ${rfpId}`
+            );
+
+            // Find the recommended proposal by matching vendor name OR proposal index
+            const recommendedProposal = rfpProposals.find((p, index) => {
+              // Get vendor name - handle both populated and unpopulated cases
+              let vendorName = "";
+              if (typeof p.vendor === "object" && p.vendor !== null) {
+                vendorName = p.vendor.company || p.vendor.name || "";
+              }
+
+              const matchesVendor =
+                vendorName &&
+                vendorName.toLowerCase() ===
+                  recommendedVendorName.toLowerCase();
+              const matchesIndex = index + 1 === recommendedProposalIndex; // proposal_id is 1-indexed
+
+              const isAcceptedOrAwarded =
+                p.status === "accepted" || p.status === "awarded";
+              return (matchesVendor || matchesIndex) && isAcceptedOrAwarded;
+            });
+
+            if (recommendedProposal) {
+              recommendedVendorsWon++;
+              console.log("Recommended vendor won this RFP!");
+            } else {
+              console.log("Recommended vendor did not win this RFP");
+            }
+          } catch (err) {
+            console.error("Error parsing recommendation:", err);
+          }
+        }
+      }
+
+      console.log(`Total recommendations followed: ${recommendedVendorsWon}`);
 
       setStats({
         totalRFPs: buyerRFPs.length,
         activeRFPs: buyerRFPs.filter((r) => r.status === "open").length,
         totalVendors: vendors.length,
         totalProposals: buyerProposals.length,
-        pendingProposals: pendingProposals.length,
         acceptedProposals: acceptedProposals.length,
+        evaluatedRFPs: evaluatedRFPs,
+        recommendedVendorsWon: recommendedVendorsWon,
       });
-
-      // Set recent RFPs (latest 5)
       const sortedRFPs = buyerRFPs
         .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
         .slice(0, 5);
       setRecentRFPs(sortedRFPs);
-
-      // Set recent proposals (latest 5)
-      const sortedProposals = buyerProposals
-        .sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt))
-        .slice(0, 5);
-      setRecentProposals(sortedProposals);
+      const sortedEvaluations = buyerEvaluations
+        .filter((e) => e.status === "completed")
+        .sort(
+          (a, b) => new Date(b.lastEvaluatedAt) - new Date(a.lastEvaluatedAt)
+        )
+        .slice(0, 3);
+      setRecentEvaluations(sortedEvaluations);
     } catch (err) {
       console.error("Error fetching dashboard data:", err);
     } finally {
@@ -176,35 +239,83 @@ const BuyerDashboard = () => {
         ))}
       </div>
 
-      {/* Secondary Stats - Proposals Breakdown */}
-      {stats.totalProposals > 0 && (
+      {/* Evaluation & Recommendation Stats */}
+      {stats.evaluatedRFPs > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-lg bg-yellow-100 flex items-center justify-center">
-                <AlertCircle className="text-yellow-600" size={20} />
+              <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center">
+                <BarChart3 className="text-indigo-600" size={20} />
               </div>
               <div>
                 <h3 className="text-2xl font-bold text-gray-900">
-                  {stats.pendingProposals}
+                  {stats.evaluatedRFPs}
                 </h3>
-                <p className="text-sm text-gray-500">Pending Review</p>
+                <p className="text-sm text-gray-500">RFPs Evaluated</p>
               </div>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
               <div
-                className="bg-yellow-500 h-2 rounded-full transition-all"
+                className="bg-indigo-500 h-2 rounded-full transition-all"
                 style={{
                   width: `${
-                    stats.totalProposals > 0
-                      ? (stats.pendingProposals / stats.totalProposals) * 100
+                    stats.totalRFPs > 0
+                      ? (stats.evaluatedRFPs / stats.totalRFPs) * 100
                       : 0
                   }%`,
                 }}
               />
             </div>
+            <p className="text-xs text-gray-500 mt-2">
+              {stats.totalRFPs > 0
+                ? Math.round((stats.evaluatedRFPs / stats.totalRFPs) * 100)
+                : 0}
+              % of all RFPs
+            </p>
           </div>
 
+          <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
+                <Award className="text-emerald-600" size={20} />
+              </div>
+              <div>
+                <h3 className="text-2xl font-bold text-gray-900">
+                  {stats.recommendedVendorsWon}
+                </h3>
+                <p className="text-sm text-gray-500">
+                  Recommendations Followed
+                </p>
+              </div>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div
+                className="bg-emerald-500 h-2 rounded-full transition-all"
+                style={{
+                  width: `${
+                    stats.evaluatedRFPs > 0
+                      ? (stats.recommendedVendorsWon / stats.evaluatedRFPs) *
+                        100
+                      : 0
+                  }%`,
+                }}
+              />
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              {stats.evaluatedRFPs > 0
+                ? Math.round(
+                    (stats.recommendedVendorsWon / stats.evaluatedRFPs) * 100
+                  )
+                : 0}
+              % success rate
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Secondary Stats - Proposals Breakdown */}
+      {stats.totalProposals > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
@@ -399,49 +510,6 @@ const BuyerDashboard = () => {
               </div>
             </div>
           </Link>
-          {stats.pendingProposals > 0 && (
-            <Link
-              to="/buyer/proposals"
-              className="block p-4 bg-yellow-50 hover:bg-yellow-100 rounded-lg transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-yellow-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <AlertCircle className="text-white" size={20} />
-                </div>
-                <div className="flex-1">
-                  <p className="font-semibold text-gray-900">
-                    Review Proposals
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    {stats.pendingProposals} proposals awaiting review
-                  </p>
-                </div>
-                <span className="px-2 py-1 bg-yellow-600 text-white text-xs font-bold rounded-full">
-                  {stats.pendingProposals}
-                </span>
-              </div>
-            </Link>
-          )}
-          {stats.activeRFPs > 0 && (
-            <Link
-              to="/buyer/rfps" // ✅ Link to RFPs list, not evaluation
-              className="block p-4 bg-green-50 hover:bg-green-100 rounded-lg transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <TrendingUp className="text-white" size={20} />
-                </div>
-                <div className="flex-1">
-                  <p className="font-semibold text-gray-900">
-                    View Active RFPs
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    {stats.activeRFPs} RFPs available for review
-                  </p>
-                </div>
-              </div>
-            </Link>
-          )}
         </div>
       </div>
     </div>
