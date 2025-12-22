@@ -16,8 +16,29 @@ const emailRoutes = require("./modules/email/email.routes");
 const evaluationRoutes = require("./modules/evaluation/evaluation.routes");
 
 const app = express();
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://procuraai-1.onrender.com",
+];
 
-app.use(cors());
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // allow requests with no origin (Postman, curl)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      } else {
+        return callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
+app.options("*", cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
