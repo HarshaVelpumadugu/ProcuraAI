@@ -56,7 +56,7 @@ const ViewRFPDetails = () => {
             </p>
           </div>
         </div>
-        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+        {/* <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
           <Button
             variant="outline"
             onClick={() => navigate(`/buyer/rfps/${id}/send`)}
@@ -77,7 +77,7 @@ const ViewRFPDetails = () => {
               <span className="sm:hidden">Close</span>
             </Button>
           )}
-        </div>
+        </div> */}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
