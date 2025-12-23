@@ -5,9 +5,9 @@ const truncateText = (text, maxLength = 1000) => {
   return text.substring(0, maxLength) + "...";
 };
 
+// ✅ Enhanced comparison with proper error handling
 const compareProposals = async (proposals, rfp) => {
   try {
-    // Optimize: Only include essential data
     const proposalSummaries = proposals.map((p, i) => ({
       id: i + 1,
       vendor: p.vendor.company || p.vendor.name,
@@ -21,7 +21,6 @@ const compareProposals = async (proposals, rfp) => {
       weaknesses: (p.aiAnalysis?.weaknesses || []).slice(0, 2),
     }));
 
-    // Concise prompt
     const prompt = `Act as a Procurement Officer Compare proposals for: ${
       rfp.title
     }
@@ -43,16 +42,73 @@ Format your response in a clear, structured way.`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
-    return response.text();
+    const comparisonText = response.text();
+
+    if (!comparisonText || comparisonText.trim().length === 0) {
+      throw new Error("AI returned empty comparison");
+    }
+
+    return {
+      success: true,
+      data: comparisonText,
+      error: null,
+    };
   } catch (error) {
-    console.error("AI Comparison Error:", error);
-    return "Comparative analysis unavailable due to an error. Please try again.";
+    console.error("❌ AI Comparison Error:", error.message);
+
+    // Return structured error with fallback data
+    return {
+      success: false,
+      data: generateFallbackComparison(proposals, rfp),
+      error: {
+        message: "AI comparison temporarily unavailable",
+        details: error.message,
+        timestamp: new Date().toISOString(),
+      },
+    };
   }
 };
 
+// ✅ Fallback comparison when AI fails
+const generateFallbackComparison = (proposals, rfp) => {
+  const sortedProposals = [...proposals].sort((a, b) => {
+    const scoreA =
+      (a.aiAnalysis?.complianceScore || 0) + (a.evaluationScore || 0);
+    const scoreB =
+      (b.aiAnalysis?.complianceScore || 0) + (b.evaluationScore || 0);
+    return scoreB - scoreA;
+  });
+
+  let comparison = `# Proposal Comparison for ${rfp.title}\n\n`;
+  comparison += `⚠️ Note: This is an automated fallback comparison. AI analysis is temporarily unavailable.\n\n`;
+  comparison += `## Budget: ${rfp.budget || "N/A"} ${
+    rfp.currency || "USD"
+  }\n\n`;
+  comparison += `## Proposals Summary\n\n`;
+
+  sortedProposals.forEach((p, i) => {
+    comparison += `### ${i + 1}. ${p.vendor.company || p.vendor.name}\n`;
+    comparison += `- **Cost:** ${p.pricing.totalCost} ${
+      p.pricing.currency || "USD"
+    }\n`;
+    comparison += `- **Timeline:** ${
+      p.timeline?.durationWeeks || "N/A"
+    } weeks\n`;
+    comparison += `- **Compliance Score:** ${
+      p.aiAnalysis?.complianceScore || 0
+    }/100\n`;
+    comparison += `- **Evaluation Score:** ${p.evaluationScore || 0}/100\n\n`;
+  });
+
+  comparison += `\n## Recommendation\n`;
+  comparison += `Please review the proposals manually and use the detailed proposal information to make an informed decision.\n`;
+
+  return comparison;
+};
+
+// ✅ Enhanced recommendation with proper error handling
 const generateRecommendation = async (proposals, rfp) => {
   try {
-    // Optimize: Minimal but complete data
     const proposalData = proposals.map((p, i) => ({
       id: i + 1,
       vendor: p.vendor.company || p.vendor.name,
@@ -106,64 +162,89 @@ Respond ONLY with valid JSON. No other text.`;
     const response = await result.response;
     let responseText = response.text();
 
-    // ✅ Clean up response - remove markdown code blocks if AI adds them
+    // Clean up response
     responseText = responseText
       .replace(/```json\n?/g, "")
       .replace(/```\n?/g, "")
       .trim();
 
-    // ✅ Validate it's valid JSON
-    try {
-      JSON.parse(responseText);
-      return responseText;
-    } catch (parseError) {
-      console.error("AI returned invalid JSON:", responseText);
+    // Validate JSON
+    const parsed = JSON.parse(responseText);
 
-      // Fallback: Create a basic recommendation structure
-      const fallback = {
-        recommendations: {
-          top_pick: {
-            proposal_id: 1,
-            vendor: proposalData[0].vendor,
-            justification:
-              "Based on available data, this proposal offers the best overall value.",
-          },
-          alternatives: proposalData.slice(1, 3).map((p, i) => ({
-            proposal_id: p.id,
-            vendor: p.vendor,
-            reason: `Alternative option with ${p.cost} cost and ${p.complianceScore} compliance score.`,
-          })),
-          key_points: [
-            "Compliance and quality are critical factors",
-            "Cost-effectiveness should be balanced with quality",
-            "Timeline feasibility is important",
-            "Vendor qualifications matter",
-          ],
-        },
-      };
-      return JSON.stringify(fallback);
+    // Validate structure
+    if (!parsed.recommendations || !parsed.recommendations.top_pick) {
+      throw new Error("Invalid recommendation structure");
     }
-  } catch (error) {
-    console.error("AI Recommendation Error:", error);
 
-    // Return a valid fallback JSON
-    const fallback = {
-      recommendations: {
-        top_pick: {
-          proposal_id: 1,
-          vendor: proposals[0]?.vendor?.company || "Vendor",
-          justification:
-            "Recommendation generation encountered an error. Please review proposals manually.",
-        },
-        alternatives: [],
-        key_points: [
-          "Manual review recommended due to technical error",
-          "Consider all proposal aspects carefully",
-        ],
+    return {
+      success: true,
+      data: responseText,
+      error: null,
+    };
+  } catch (error) {
+    console.error("❌ AI Recommendation Error:", error.message);
+
+    // Return structured error with intelligent fallback
+    return {
+      success: false,
+      data: generateFallbackRecommendation(proposals),
+      error: {
+        message: "AI recommendation temporarily unavailable",
+        details: error.message,
+        timestamp: new Date().toISOString(),
       },
     };
-    return JSON.stringify(fallback);
   }
+};
+
+// ✅ Intelligent fallback recommendation based on scores
+const generateFallbackRecommendation = (proposals) => {
+  // Calculate combined scores
+  const scoredProposals = proposals.map((p, i) => ({
+    id: i + 1,
+    vendor: p.vendor.company || p.vendor.name,
+    cost: p.pricing.totalCost,
+    complianceScore: p.aiAnalysis?.complianceScore || 0,
+    evaluationScore: p.evaluationScore || 0,
+    combinedScore:
+      (p.aiAnalysis?.complianceScore || 0) + (p.evaluationScore || 0),
+  }));
+
+  // Sort by combined score
+  scoredProposals.sort((a, b) => b.combinedScore - a.combinedScore);
+
+  const fallback = {
+    recommendations: {
+      top_pick: {
+        proposal_id: scoredProposals[0].id,
+        vendor: scoredProposals[0].vendor,
+        justification: `⚠️ AI recommendation is temporarily unavailable. This proposal was selected based on the highest combined compliance score (${scoredProposals[0].complianceScore}) and evaluation score (${scoredProposals[0].evaluationScore}). Please review manually for final decision.`,
+        automated_selection: true,
+        note: "This is an automated fallback recommendation. Manual review is strongly recommended.",
+      },
+      alternatives: scoredProposals.slice(1, 3).map((p) => ({
+        proposal_id: p.id,
+        vendor: p.vendor,
+        reason: `Combined score: ${p.combinedScore}/200. Cost: ${p.cost}. Please review detailed proposal information.`,
+        automated_selection: true,
+      })),
+      key_points: [
+        "⚠️ AI analysis is temporarily unavailable",
+        "Recommendations are based solely on compliance and evaluation scores",
+        "Manual review of all proposals is strongly recommended",
+        "Consider reviewing vendor qualifications, timeline feasibility, and detailed proposals",
+        "Contact support if AI analysis continues to fail",
+      ],
+    },
+    metadata: {
+      is_fallback: true,
+      fallback_reason: "AI service temporarily unavailable",
+      selection_criteria: "Highest combined compliance and evaluation scores",
+      generated_at: new Date().toISOString(),
+    },
+  };
+
+  return JSON.stringify(fallback);
 };
 
 module.exports = {
