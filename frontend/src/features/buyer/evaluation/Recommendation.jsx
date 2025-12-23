@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Award, TrendingUp, DollarSign, Clock } from "lucide-react";
+import {
+  ArrowLeft,
+  Award,
+  TrendingUp,
+  DollarSign,
+  AlertTriangle,
+  Bot,
+} from "lucide-react";
 import { evaluationAPI } from "../../../api/evaluation.api";
 import { rfpAPI } from "../../../api/rfp.api";
 import Button from "../../../components/common/Button";
@@ -65,6 +72,12 @@ const Recommendation = () => {
   const keyPoints =
     recommendation?.parsedData?.recommendations?.key_points || [];
 
+  // ✅ Check if this is a fallback recommendation
+  const isFallback =
+    recommendation?.aiGenerationFailed ||
+    recommendation?.parsedData?.metadata?.is_fallback ||
+    topPick?.automated_selection;
+
   return (
     <div className="min-h-screen bg-gray-50 w-full">
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
@@ -80,7 +93,9 @@ const Recommendation = () => {
             </Button>
             <div className="flex-1 min-w-0 w-full">
               <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-gray-900 break-words">
-                AI Recommendation
+                {isFallback
+                  ? "📊 Automated Recommendation"
+                  : "🤖 AI Recommendation"}
               </h1>
               <p className="text-gray-500 mt-1 sm:mt-2 text-sm sm:text-base lg:text-lg break-words">
                 {rfp?.title}
@@ -88,28 +103,81 @@ const Recommendation = () => {
             </div>
           </div>
 
+          {/* ✅ Parse Error Alert */}
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 sm:p-4 text-red-600">
               <p className="text-sm sm:text-base break-words">{error}</p>
             </div>
           )}
 
+          {/* ✅ AI Failure Warning Banner */}
+          {isFallback && recommendation?.warnings && (
+            <div className="bg-yellow-50 border-l-4 border-yellow-400 rounded-lg shadow-md">
+              <div className="p-4 sm:p-6">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="text-yellow-600 flex-shrink-0 w-6 h-6 mt-0.5" />
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-yellow-900 mb-2">
+                      ⚠️ Automated Fallback Recommendation
+                    </h3>
+                    <ul className="space-y-2">
+                      {recommendation.warnings.map((warning, idx) => (
+                        <li
+                          key={idx}
+                          className="text-sm text-yellow-800 flex items-start gap-2"
+                        >
+                          <span className="flex-shrink-0">•</span>
+                          <span>{warning}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    {recommendation.error && (
+                      <div className="mt-3 p-3 bg-yellow-100 rounded border border-yellow-200">
+                        <p className="text-xs font-mono text-yellow-900">
+                          Error:{" "}
+                          {recommendation.error.message || recommendation.error}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {recommendation && topPick ? (
             <div className="space-y-4 sm:space-y-6">
-              {/* Recommended Vendor Card */}
-              <div className="bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl sm:rounded-2xl shadow-2xl p-5 sm:p-6 md:p-8 lg:p-10 text-white">
+              {/* ✅ Recommended Vendor Card with Fallback Indicator */}
+              <div
+                className={`rounded-xl sm:rounded-2xl shadow-2xl p-5 sm:p-6 md:p-8 lg:p-10 text-white ${
+                  isFallback
+                    ? "bg-gradient-to-br from-yellow-600 to-orange-600"
+                    : "bg-gradient-to-br from-blue-600 to-purple-600"
+                }`}
+              >
                 <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4 lg:mb-6">
-                  <Award className="flex-shrink-0 w-6 h-6 sm:w-8 sm:h-8 lg:w-10 lg:h-10" />
+                  {isFallback ? (
+                    <Bot className="flex-shrink-0 w-6 h-6 sm:w-8 sm:h-8 lg:w-10 lg:h-10" />
+                  ) : (
+                    <Award className="flex-shrink-0 w-6 h-6 sm:w-8 sm:h-8 lg:w-10 lg:h-10" />
+                  )}
                   <h2 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold">
-                    Recommended Vendor
+                    {isFallback
+                      ? "Top Scoring Vendor (Automated)"
+                      : "Recommended Vendor"}
                   </h2>
                 </div>
                 <p className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold mb-2 sm:mb-3 break-words">
                   {topPick.vendor}
                 </p>
-                <p className="text-blue-100 text-sm sm:text-base lg:text-lg break-words">
-                  Proposal ID: {topPick.proposal_id}
-                </p>
+                <div className="flex items-center gap-2 text-blue-100 text-sm sm:text-base lg:text-lg">
+                  <span>Proposal ID: {topPick.proposal_id}</span>
+                  {topPick.automated_selection && (
+                    <span className="bg-white/20 px-2 py-1 rounded text-xs">
+                      AUTO-SELECTED
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Stats Grid */}
@@ -144,7 +212,9 @@ const Recommendation = () => {
                     {topPick.vendor}
                   </p>
                   <p className="text-xs sm:text-sm lg:text-base text-gray-500 mt-2">
-                    Best overall match
+                    {isFallback
+                      ? "Highest combined score"
+                      : "Best overall match"}
                   </p>
                 </div>
 
@@ -166,19 +236,30 @@ const Recommendation = () => {
                 </div>
               </div>
 
-              {/* Top Pick Justification */}
+              {/* ✅ Top Pick Justification with Fallback Warning */}
               <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-5 sm:p-6 md:p-8 lg:p-10 border border-gray-100">
                 <h3 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-gray-900 mb-4 sm:mb-5 lg:mb-6">
-                  Why This Vendor?
+                  {isFallback ? "Selection Rationale" : "Why This Vendor?"}
                 </h3>
-                <div className="bg-blue-50 border-l-4 border-blue-600 p-4 sm:p-5 lg:p-6 rounded-lg">
+                <div
+                  className={`border-l-4 p-4 sm:p-5 lg:p-6 rounded-lg ${
+                    isFallback
+                      ? "bg-yellow-50 border-yellow-600"
+                      : "bg-blue-50 border-blue-600"
+                  }`}
+                >
+                  {topPick.note && (
+                    <div className="mb-4 p-3 bg-yellow-100 border border-yellow-300 rounded text-yellow-900 text-sm">
+                      <strong>Note:</strong> {topPick.note}
+                    </div>
+                  )}
                   <p className="text-sm sm:text-base lg:text-lg text-gray-700 leading-relaxed break-words">
                     {topPick.justification}
                   </p>
                 </div>
               </div>
 
-              {/* Alternative Vendors */}
+              {/* ✅ Alternative Vendors with Fallback Indicator */}
               {alternatives.length > 0 && (
                 <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-5 sm:p-6 md:p-8 lg:p-10 border border-gray-100">
                   <h3 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-gray-900 mb-4 sm:mb-5 lg:mb-6">
@@ -197,9 +278,16 @@ const Recommendation = () => {
                             </span>
                           </div>
                           <div className="flex-1 min-w-0">
-                            <h4 className="font-bold text-gray-900 text-base sm:text-lg lg:text-xl break-words">
-                              {alt.vendor}
-                            </h4>
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-bold text-gray-900 text-base sm:text-lg lg:text-xl break-words">
+                                {alt.vendor}
+                              </h4>
+                              {alt.automated_selection && (
+                                <span className="bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded text-xs font-medium">
+                                  AUTO
+                                </span>
+                              )}
+                            </div>
                             <p className="text-xs sm:text-sm lg:text-base text-gray-500 mt-1 break-words">
                               Proposal ID: {alt.proposal_id}
                             </p>
@@ -226,8 +314,20 @@ const Recommendation = () => {
                         key={index}
                         className="flex items-start gap-3 sm:gap-4"
                       >
-                        <div className="w-6 h-6 sm:w-8 sm:h-8 lg:w-10 lg:h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                          <span className="text-blue-600 text-xs sm:text-sm lg:text-base font-bold">
+                        <div
+                          className={`w-6 h-6 sm:w-8 sm:h-8 lg:w-10 lg:h-10 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                            point.startsWith("⚠️")
+                              ? "bg-yellow-100"
+                              : "bg-blue-100"
+                          }`}
+                        >
+                          <span
+                            className={`text-xs sm:text-sm lg:text-base font-bold ${
+                              point.startsWith("⚠️")
+                                ? "text-yellow-600"
+                                : "text-blue-600"
+                            }`}
+                          >
                             {index + 1}
                           </span>
                         </div>
@@ -237,6 +337,16 @@ const Recommendation = () => {
                       </li>
                     ))}
                   </ul>
+                </div>
+              )}
+
+              {/* ✅ Cached/Fresh Indicator */}
+              {recommendation.lastEvaluated && (
+                <div className="text-center text-xs text-gray-500">
+                  {recommendation.cached
+                    ? "Using cached recommendation from"
+                    : "Generated on"}{" "}
+                  {new Date(recommendation.lastEvaluated).toLocaleString()}
                 </div>
               )}
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, TrendingUp } from "lucide-react";
+import { ArrowLeft, TrendingUp, AlertTriangle } from "lucide-react";
 import { evaluationAPI } from "../../../api/evaluation.api";
 import { proposalAPI } from "../../../api/proposal.api";
 import { rfpAPI } from "../../../api/rfp.api";
@@ -29,7 +29,6 @@ const CompareProposals = () => {
       console.log("Fetched RFP Data:", rfpData);
       console.log("Fetched Proposals Data:", proposalsData.data);
 
-      // FIXED: Access nested data correctly
       setRfp(rfpData.data);
       setProposals(proposalsData.data);
     } catch (err) {
@@ -42,7 +41,8 @@ const CompareProposals = () => {
     setComparing(true);
     try {
       const result = await evaluationAPI.compare(id);
-      setComparison(result);
+      console.log("Comparison result:", result);
+      setComparison(result.data); // Store the full response data
     } catch (err) {
       console.error("Error comparing proposals:", err);
       alert("Failed to compare proposals");
@@ -55,7 +55,7 @@ const CompareProposals = () => {
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header Section - Responsive */}
+        {/* Header Section */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-4">
             <Button
@@ -90,6 +90,40 @@ const CompareProposals = () => {
           </div>
         </div>
 
+        {/* ✅ AI Failure Warning Banner */}
+        {comparison?.aiGenerationFailed && comparison?.warnings && (
+          <div className="bg-yellow-50 border-l-4 border-yellow-400 rounded-lg shadow-md">
+            <div className="p-4 sm:p-6">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="text-yellow-600 flex-shrink-0 w-6 h-6 mt-0.5" />
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-yellow-900 mb-2">
+                    ⚠️ Fallback Comparison Generated
+                  </h3>
+                  <ul className="space-y-2">
+                    {comparison.warnings.map((warning, idx) => (
+                      <li
+                        key={idx}
+                        className="text-sm text-yellow-800 flex items-start gap-2"
+                      >
+                        <span className="flex-shrink-0">•</span>
+                        <span>{warning}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  {comparison.error && (
+                    <div className="mt-3 p-3 bg-yellow-100 rounded border border-yellow-200">
+                      <p className="text-xs font-mono text-yellow-900">
+                        Error: {comparison.error.message || comparison.error}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* No Proposals State */}
         {proposals.length === 0 ? (
           <div className="bg-white rounded-xl shadow-lg p-12 text-center border border-gray-100">
@@ -97,7 +131,7 @@ const CompareProposals = () => {
           </div>
         ) : (
           <>
-            {/* Desktop Table View - Hidden on mobile/tablet */}
+            {/* Desktop Table View */}
             <div className="hidden lg:block bg-white rounded-xl shadow-lg border border-gray-100 overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-100">
@@ -110,7 +144,6 @@ const CompareProposals = () => {
                         key={proposal._id}
                         className="px-6 py-4 text-left text-sm font-semibold text-gray-900"
                       >
-                        {/* FIXED: Access vendor.name or vendor.company */}
                         {proposal.vendor?.name ||
                           proposal.vendor?.company ||
                           `Vendor ${idx + 1}`}
@@ -141,7 +174,6 @@ const CompareProposals = () => {
                         key={proposal._id}
                         className="px-6 py-4 text-gray-600"
                       >
-                        {/* FIXED: Access pricing.totalCost instead of price */}
                         $
                         {proposal.pricing?.totalCost?.toLocaleString() || "N/A"}
                       </td>
@@ -156,7 +188,6 @@ const CompareProposals = () => {
                         key={proposal._id}
                         className="px-6 py-4 text-gray-600"
                       >
-                        {/* FIXED: Access timeline.durationWeeks */}
                         {proposal.timeline?.durationWeeks
                           ? `${proposal.timeline.durationWeeks} weeks`
                           : "N/A"}
@@ -208,7 +239,6 @@ const CompareProposals = () => {
                         key={proposal._id}
                         className="px-6 py-4 text-gray-600 max-w-xs"
                       >
-                        {/* FIXED: Access coverLetter instead of description */}
                         <p className="line-clamp-2">
                           {proposal.coverLetter || "N/A"}
                         </p>
@@ -219,7 +249,7 @@ const CompareProposals = () => {
               </table>
             </div>
 
-            {/* Mobile/Tablet Card View - Shown on small/medium screens */}
+            {/* Mobile/Tablet Card View */}
             <div className="lg:hidden space-y-4">
               {proposals.map((proposal, idx) => (
                 <div
@@ -297,17 +327,15 @@ const CompareProposals = () => {
             </div>
           </>
         )}
-
-        {/* Analysis Results */}
         {comparison && (
-          <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl shadow-lg p-6 sm:p-8 border border-blue-100">
+          <div className="bg-white rounded-xl shadow-lg p-6 sm:p-8 border border-gray-200">
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4">
               Analysis Results
             </h2>
             <div className="prose max-w-none">
-              <p className="text-gray-700 text-sm sm:text-base leading-relaxed">
-                {comparison.summary || "Comparison completed successfully"}
-              </p>
+              <div className="text-gray-700 text-sm sm:text-base leading-relaxed">
+                {comparison.message || "Comparison completed successfully"}
+              </div>
             </div>
           </div>
         )}
